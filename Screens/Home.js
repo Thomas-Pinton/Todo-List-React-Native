@@ -1,11 +1,10 @@
 import { StatusBar } from 'expo-status-bar';
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useState } from 'react';
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, KeyboardAvoidingView, Keyboard, TouchableWithoutFeedbackBase } from 'react-native';
 import { SelectList } from 'react-native-dropdown-select-list'
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
-
+import * as db from '../data/tasksDb';
 import Task from '../components/Task';
 
 let data = [
@@ -15,22 +14,61 @@ let data = [
   {key:'3', value:'Fun'}
 ]
 
-let value = null;
+console.log("Iniciando")
 
-//value = AsyncStorage.getItem('category0');
-
-if (!value) // if database is empty, load basic values
-{
-  const jsonValue0 = JSON.stringify({value: data[0].value, color: 'red' })
-  const jsonValue1 = JSON.stringify({value: data[1].value, color: 'green' })
-  const jsonValue2 = JSON.stringify({value: data[2].value, color: 'blue' })
-  const jsonValue3 = JSON.stringify({value: data[3].value, color: 'yellow' })
-  //await AsyncStorage.setItem('category0', jsonValue0);
-  //await AsyncStorage.setItem('category1', jsonValue1);
-  //await AsyncStorage.setItem('category2', jsonValue2);
-  //await AsyncStorage.setItem('category3', jsonValue3);
+const addValues = async () => {
+  const jsonValue0 = {key: data[0].value, value: data[0].value, color: 'red' }
+  const jsonValue1 = {key: data[1].value, value: data[1].value, color: 'green' }
+  const jsonValue2 = {key: data[2].value, value: data[2].value, color: 'blue' }
+  const jsonValue3 = {key: data[3].value, value: data[3].value, color: 'yellow' }
+  await db.addCategory('0', jsonValue0);
+  await db.addCategory('1', jsonValue1);
+  await db.addCategory('2', jsonValue2);
+  await db.addCategory('3', jsonValue3);
 }
 
+///*
+
+const recoverTasksFromDatabase = async () => {
+  let keys = await db.getAllTasksKeys();
+  if (keys)
+  {
+    let tasks = [];
+    for (let key in keys)
+      tasks.push(await db.getTask(key));
+    console.log('tasks from database ', tasks);
+    return tasks;
+  } else 
+  {
+    console.log("No tasks to recover!");
+    return [];
+  }
+  
+}
+
+const recoverCategoriesFromDatabase = async () => {
+  let keys = await db.getAllCategoriesKeys();
+  if (keys)
+  {
+    let cat = [];
+    for (let i = 0; i < keys.length; i++)
+    {
+      cat[i] = await db.getCategory(keys[i]);
+    }
+    return cat;
+  } else 
+  {
+    console.log("No categories to recover!");
+    return [];
+  }
+}
+
+const addBaseCategories = async ()=> {
+  if (await recoverCategoriesFromDatabase().length == 0)
+    addValues();
+}
+
+addBaseCategories();
 
 export default function Home({ navigation }) 
 {
@@ -46,24 +84,51 @@ export default function Home({ navigation })
     const [task, setTask] = useState();
     const [tasks, setTasks] = useState([]);
 
-    const [selected, setSelected] = useState(data[0]);
+    const [categories, setCategories] = useState([
+      {key:'0', value:'My Tasks', color: 'red'},
+      {key:'1', value:'Home', color: 'green'},
+      {key:'2', value:'Job', color: 'blue'},
+      {key:'3', value:'Fun', color: 'yellow'}
+    ]);
 
-    const addTask = () => {
-        //Keyboard.dismiss();
+    const [categoriesList, setCategoriesList] = useState(data);
+
+    const transformCategoriesIntoList = () => {
+      let array = [];
+      console.log("Transform categories into list ", categories)
+      for (let i = 0; i < categories.length; i++)
+        array[i] = {key: categories[i].key, value: categories[i].value};
+      setCategoriesList(array);
+    }
+
+    useEffect(() => {
+      async function getData() {
+        setTasks(await recoverTasksFromDatabase());
+        setCategories(await recoverCategoriesFromDatabase());
+      }
+      getData();
+      transformCategoriesIntoList();
+      // 1 category with all the data and 1 category list to use the dropdown list
+    }, [])
+
+    const [selected, setSelected] = useState(categoriesList[0]);
+
+    const addTaskToList = () => {
+        Keyboard.dismiss();
         setTasks([...tasks, {text: task, category: selected}]);
-        //AsyncStorage.setItem(`task${tasks.length}`, JSON.stringify(task));
+        db.addTask(tasks.length.toString(), {text: task, category: selected});
         setTask(null);
     }
 
     const deleteTask = (index) => {
         let tasksCopy = [...tasks];
-        //AsyncStorage.removeItem(`task${index}`);
+        db.removeTask(index.toString());
         tasksCopy.splice(index, 1);
         setTasks(tasksCopy);
     }
 
     const pressSettingsButton = () => {
-        navigation.navigate("Settings", data);
+        navigation.navigate("Settings", categoriesList);
     }
 
     return (
@@ -77,7 +142,7 @@ export default function Home({ navigation })
             <View style = {styles.selection}>
               <SelectList 
                   setSelected={(val) => setSelected(val)} 
-                  data={data} 
+                  data={categoriesList} 
                   save="key"
                   search = {false}
                   inputStyles={{fontSize: 24, fontWeight: 'bold',}}
@@ -90,6 +155,7 @@ export default function Home({ navigation })
     
           <View style = {styles.box}>
             <View style={styles.tasks}>
+              {console.log('tasks ', tasks)}
               {
                 tasks.map((item, index) => {
                   console.log(item)
@@ -115,7 +181,7 @@ export default function Home({ navigation })
             placeholder = {"Write a task"} placeholderTextColor = "#fff"
             value={task} onChangeText = { text => setTask(text)} />
     
-            <TouchableOpacity style = {styles.addTaskButton} onPress={ () => {addTask()}}>
+            <TouchableOpacity style = {styles.addTaskButton} onPress={ () => {addTaskToList()}}>
               <View style = {styles.addTask}>
                 <Text style = {styles.addTaskText}>+</Text>
               </View>

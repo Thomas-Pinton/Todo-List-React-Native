@@ -23,16 +23,15 @@ export default function Settings({ navigation })
             return
         navigation.state.params[selected].value = name;
 
-        /*
-        //let categoryString = await AsyncStorage.getItem(`category${selected}`);
+        let categoryString = await AsyncStorage.getItem(`category${selected}`);
         if (!categoryString)
             return
         let categoryObject = JSON.parse(categoryString);
         categoryJson.value = categoryObject;
 
         categoryString = JSON.stringify(categoryJson);
-        */
-        //AsyncStorage.setItem(`category${selected}`,categoryString);
+        
+        AsyncStorage.setItem(`category${selected}`,categoryString);
     }
 
     return (
